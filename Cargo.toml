@@ -1,0 +1,18 @@
+[package]
+name = "polyline-iter"
+version = "0.1.0"
+edition = "2021"
+authors = ["Stepan Kizim <stsiapan.kizim@gmail.com>"]
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+# No dependencies
+
+[dev-dependencies]
+pretty_assertions = "1"
+criterion = { version = "0.4" }
+polyline = "0.11"
+
+[[bench]]
+name = "polyline-iter"
+harness = false
