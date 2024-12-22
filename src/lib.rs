@@ -224,7 +224,7 @@ mod tests {
         // Now let's add `!` in the middle of a valid polyline.
         let polyline = "_p~iF~ps|U_ulLnnqC!_mqNvxq";
         assert!(!check_polyline(polyline)); // the polyline is not valid, but still can be decoded.
-        let mut iter = PolylineIter::new(6, polyline);
+        let mut iter = PolylineIter::new(5, polyline);
         assert_eq!(iter.next(), Some((38.5, -120.2)));
         assert_eq!(iter.next(), Some((40.7, -120.95)));
         assert_eq!(iter.next(), None);
