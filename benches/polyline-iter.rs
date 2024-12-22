@@ -9,25 +9,25 @@ const LARGE_POLYLINE: &str = "ebmhHaycNlB`GDLDLjB`GHTDP@JAJAJ?BGTBFs@v@KT?TbFdPP
 fn iterator_benchmark(c: &mut Criterion) {
     c.bench_function("small polyline5 points count", |b| {
         b.iter(|| {
-            black_box(PolylineIter::new(SMALL_POLYLINE, 5).count());
+            black_box(PolylineIter::new(5, SMALL_POLYLINE).count());
         })
     });
     c.bench_function("large polyline5 points count", |b| {
         b.iter(|| {
-            black_box(PolylineIter::new(LARGE_POLYLINE, 5).count());
+            black_box(PolylineIter::new(5, LARGE_POLYLINE).count());
         })
     });
 
     c.bench_function("iter small polyline5", |b| {
         b.iter(|| {
-            for (lat, lon) in PolylineIter::new(SMALL_POLYLINE, 5) {
+            for (lat, lon) in PolylineIter::new(5, SMALL_POLYLINE) {
                 black_box((lat, lon));
             }
         })
     });
     c.bench_function("iter large polyline5", |b| {
         b.iter(|| {
-            for (lat, lon) in PolylineIter::new(LARGE_POLYLINE, 5) {
+            for (lat, lon) in PolylineIter::new(5, LARGE_POLYLINE) {
                 black_box((lat, lon));
             }
         })

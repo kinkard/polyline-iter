@@ -8,7 +8,7 @@ pub struct PolylineIter<'a> {
 }
 
 impl<'a> PolylineIter<'a> {
-    pub fn new(polyline: &'a str, precision: u8) -> Self {
+    pub fn new(precision: u8, polyline: &'a str) -> Self {
         assert!(precision <= 7, "i32 can hold up to 180 * 10^7");
         PolylineIter {
             polyline: polyline.as_bytes(),
@@ -63,7 +63,6 @@ fn zigzag_decode(i: u32) -> i32 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use pretty_assertions::assert_eq;
 
     /// Checks if the polyline contains only valid characters and ends with a complete point.
     fn check_polyline(polyline: &str) -> bool {
@@ -103,8 +102,8 @@ mod tests {
 
     #[test]
     fn empty_polyline() {
-        assert_eq!(PolylineIter::new("", 5).next(), None);
-        assert_eq!(PolylineIter::new("", 6).next(), None);
+        assert_eq!(PolylineIter::new(5, "").next(), None);
+        assert_eq!(PolylineIter::new(6, "").next(), None);
         assert!(check_polyline(""));
     }
 
@@ -112,11 +111,11 @@ mod tests {
     fn single_point() {
         let polyline = "_p~iF~ps|U_";
         assert!(check_polyline(polyline));
-        let mut iter = PolylineIter::new(polyline, 5);
+        let mut iter = PolylineIter::new(5, polyline);
         assert_eq!(iter.next(), Some((38.5, -120.2)));
         assert_eq!(iter.next(), None);
 
-        let mut iter = PolylineIter::new(polyline, 6);
+        let mut iter = PolylineIter::new(6, polyline);
         assert_eq!(iter.next(), Some((3.85, -12.02)));
         assert_eq!(iter.next(), None);
     }
@@ -125,7 +124,7 @@ mod tests {
     fn multiple_points() {
         let polyline = "angrIk~inAgwDybH_|D_{KeoEwtLozFo`Gre@tcA";
         assert!(check_polyline(polyline));
-        let mut iter = PolylineIter::new(polyline, 5);
+        let mut iter = PolylineIter::new(5, polyline);
         assert_eq!(iter.next(), Some((55.58513, 12.99958)));
         assert_eq!(iter.next(), Some((55.61461, 13.04627)));
         assert_eq!(iter.next(), Some((55.64485, 13.11219)));
@@ -134,7 +133,7 @@ mod tests {
         assert_eq!(iter.next(), Some((55.71222, 13.21244)));
         assert_eq!(iter.next(), None);
 
-        let mut iter = PolylineIter::new(polyline, 6);
+        let mut iter = PolylineIter::new(6, polyline);
         assert_eq!(iter.next(), Some((5.558513, 1.299958)));
         assert_eq!(iter.next(), Some((5.561461, 1.304627)));
         assert_eq!(iter.next(), Some((5.564485, 1.311219)));
@@ -142,6 +141,52 @@ mod tests {
         assert_eq!(iter.next(), Some((5.571840, 1.322343)));
         assert_eq!(iter.next(), Some((5.571222, 1.321244)));
         assert_eq!(iter.next(), None);
+
+        let points = &[
+            (55.71218, 13.21562),
+            (55.71221, 13.21579),
+            (55.71205, 13.21584),
+            (55.71211, 13.21652),
+            (55.71252, 13.21646),
+            (55.71269, 13.21651),
+            (55.71287, 13.21652),
+            (55.71301, 13.21654),
+            (55.71315, 13.21656),
+            (55.71328, 13.21659),
+            (55.71347, 13.21663),
+            (55.71361, 13.21664),
+            (55.71368, 13.21667),
+            (55.71429, 13.21693),
+            (55.71499, 13.21713),
+            (55.71556, 13.21718),
+            (55.71568, 13.21715),
+            (55.71578, 13.21708),
+            (55.71578, 13.21676),
+            (55.71577, 13.21631),
+            (55.71575, 13.21585),
+            (55.71576, 13.21582),
+            (55.71591, 13.21578),
+            (55.71595, 13.21650),
+            (55.71596, 13.21667),
+            (55.71595, 13.21667),
+        ];
+        assert_eq!(
+            PolylineIter::new(
+                5,
+                "ch`sIsdtoAEa@^IKgCqAJa@Ic@A[C[CYEe@G[AMEyBs@kCg@qBIWDSL?~@@xABzAAD]FGoCAa@@?",
+            )
+            .collect::<Vec::<_>>(),
+            points
+        );
+
+        assert_eq!(
+            PolylineIter::new(
+                6,
+                "gzkgiBgwreX{@sI~HcBwBoi@sXvBsIcBgJSwGg@wGg@cG{@{JoAwGSkC{@ce@gOwj@oKsb@cBoFz@gEjC?~RRb[f@v[Sz@kHnAoA_l@SsIR?",
+            )
+            .collect::<Vec::<_>>(),
+            points
+        );
     }
 
     #[test]
@@ -149,12 +194,12 @@ mod tests {
         // Last point is missing a lon change, so the whole points will be skipped.
         let polyline = "_p~iF~ps|U_ulLnnqC_mqNvxq";
         assert!(!check_polyline(polyline)); // the polyline is not valid, but still can be decoded.
-        let mut iter = PolylineIter::new(polyline, 5);
+        let mut iter = PolylineIter::new(5, polyline);
         assert_eq!(iter.next(), Some((38.5, -120.2)));
         assert_eq!(iter.next(), Some((40.7, -120.95)));
         assert_eq!(iter.next(), None);
 
-        let mut iter = PolylineIter::new(polyline, 6);
+        let mut iter = PolylineIter::new(6, polyline);
         assert_eq!(iter.next(), Some((3.85, -12.02)));
         assert_eq!(iter.next(), Some((4.07, -12.095)));
         assert_eq!(iter.next(), None);
@@ -167,13 +212,13 @@ mod tests {
         // `!` (33) is not a valid symbol for a polyline because it is not in the range [63, 127].
         let polyline = "!!!!";
         assert!(!check_polyline(polyline));
-        let mut iter = PolylineIter::new(polyline, 5);
+        let mut iter = PolylineIter::new(5, polyline);
         assert_eq!(iter.next(), None);
 
         // Now let's add `!` in the middle of a valid polyline.
         let polyline = "_p~iF~ps|U_ulLnnqC!_mqNvxq";
         assert!(!check_polyline(polyline)); // the polyline is not valid, but still can be decoded.
-        let mut iter = PolylineIter::new(polyline, 5);
+        let mut iter = PolylineIter::new(6, polyline);
         assert_eq!(iter.next(), Some((38.5, -120.2)));
         assert_eq!(iter.next(), Some((40.7, -120.95)));
         assert_eq!(iter.next(), None);
@@ -181,7 +226,7 @@ mod tests {
 
     #[test]
     fn size_hint() {
-        let iter = PolylineIter::new("_p~iF~ps|U_ulLnnqC_mqNvxq`@", 5);
+        let iter = PolylineIter::new(5, "_p~iF~ps|U_ulLnnqC_mqNvxq`@");
         // Size hint should not be precise as the number of points depends the distance between them.
         assert!(iter.size_hint().0 <= 3);
         assert!(iter.size_hint().1.unwrap() >= 3);

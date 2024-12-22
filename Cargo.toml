@@ -9,7 +9,6 @@ license = "MIT OR Apache-2.0"
 # No dependencies
 
 [dev-dependencies]
-pretty_assertions = "1"
 criterion = { version = "0.4" }
 polyline = "0.11"
 
