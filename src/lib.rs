@@ -1,5 +1,20 @@
-/// Iterator over points decoded from a polyline5 or polyline6.
+/// Iterator over points, decoded from a polyline5 or polyline6.
 /// See https://developers.google.com/maps/documentation/utilities/polylinealgorithm
+///
+/// ```
+/// let iter = PolylineIter::new(5, "angrIk~inAgwDybH_|D_{KeoEwtLozFo`Gre@tcA");
+/// assert_eq!(
+///     iter.collect::<Vec<_>>(),
+///     vec![
+///         (55.58513, 12.99958),
+///         (55.61461, 13.04627),
+///         (55.64485, 13.11219),
+///         (55.67816, 13.18223),
+///         (55.71840, 13.22343),
+///         (55.71222, 13.21244),
+///     ]
+/// );
+/// ```
 pub struct PolylineIter<'a> {
     polyline: &'a [u8],
     lat: i32,
@@ -8,6 +23,8 @@ pub struct PolylineIter<'a> {
 }
 
 impl<'a> PolylineIter<'a> {
+    /// Creates a new iterator over points decoded from a polyline.
+    /// The precision is the number of decimal places in the coordinates, which is 5 for polyline5 and 6 for polyline6.
     pub fn new(precision: u8, polyline: &'a str) -> Self {
         assert!(precision <= 7, "i32 can hold up to 180 * 10^7");
         PolylineIter {
@@ -170,23 +187,12 @@ mod tests {
             (55.71596, 13.21667),
             (55.71595, 13.21667),
         ];
-        assert_eq!(
-            PolylineIter::new(
-                5,
-                "ch`sIsdtoAEa@^IKgCqAJa@Ic@A[C[CYEe@G[AMEyBs@kCg@qBIWDSL?~@@xABzAAD]FGoCAa@@?",
-            )
-            .collect::<Vec::<_>>(),
-            points
-        );
+        let polyline =
+            "ch`sIsdtoAEa@^IKgCqAJa@Ic@A[C[CYEe@G[AMEyBs@kCg@qBIWDSL?~@@xABzAAD]FGoCAa@@?";
+        assert_eq!(PolylineIter::new(5, polyline,).collect::<Vec<_>>(), points);
 
-        assert_eq!(
-            PolylineIter::new(
-                6,
-                "gzkgiBgwreX{@sI~HcBwBoi@sXvBsIcBgJSwGg@wGg@cG{@{JoAwGSkC{@ce@gOwj@oKsb@cBoFz@gEjC?~RRb[f@v[Sz@kHnAoA_l@SsIR?",
-            )
-            .collect::<Vec::<_>>(),
-            points
-        );
+        let polyline = "gzkgiBgwreX{@sI~HcBwBoi@sXvBsIcBgJSwGg@wGg@cG{@{JoAwGSkC{@ce@gOwj@oKsb@cBoFz@gEjC?~RRb[f@v[Sz@kHnAoA_l@SsIR?";
+        assert_eq!(PolylineIter::new(6, polyline,).collect::<Vec<_>>(), points);
     }
 
     #[test]
