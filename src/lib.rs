@@ -72,10 +72,54 @@ impl Iterator for PolylineIter<'_> {
     }
 }
 
+/// Encodes a sequence of points into a polyline with the given precision.
+///
+/// ```
+/// assert_eq!(polyline_iter::encode(5, &[(55.58513, 12.99958), (55.61461, 13.04627)]),"angrIk~inAgwDybH");
+/// ```
+pub fn encode<'a, It>(precision: u8, points: It) -> String
+where
+    It: IntoIterator<Item = &'a (f64, f64)>,
+{
+    assert!(precision <= 7, "i32 can hold up to 180 * 10^7");
+
+    let scale = 10.0_f64.powi(precision as i32);
+    let mut result = String::new();
+
+    let mut prev = (0.0, 0.0);
+    for point in points {
+        let lat_change = ((point.0 - prev.0) * scale).round() as i32;
+        let lon_change = ((point.1 - prev.1) * scale).round() as i32;
+
+        varint_encode(zigzag_encode(lat_change), &mut result);
+        varint_encode(zigzag_encode(lon_change), &mut result);
+
+        prev = *point;
+    }
+    result
+}
+
 /// Zigzag encoded numbers store the sign in the least significant bit, which this function moves to the sign bit.
-#[inline(always)]
 fn zigzag_decode(i: u32) -> i32 {
     (i >> 1) as i32 ^ -((i & 1) as i32)
+}
+
+/// Moves the sign bit from the most significant bit to the least significant bit,
+/// thus reducing number of significant bits for negative numbers.
+fn zigzag_encode(value: i32) -> u32 {
+    (value << 1) as u32 ^ (value >> 31) as u32
+}
+
+/// Encodes the value into a variable-length format, storing 5 bits per byte to keep
+/// all bytes URL-compatible (from 63 to 126).
+fn varint_encode(mut value: u32, buffer: &mut String) {
+    while value >= 0x20 {
+        let byte = char::from_u32(((value & 0x1F) | 0x20) + 63).unwrap();
+        buffer.push(byte);
+        value >>= 5;
+    }
+    let byte = char::from_u32(value + 63).unwrap();
+    buffer.push(byte);
 }
 
 #[cfg(test)]
@@ -116,26 +160,93 @@ mod tests {
         assert_eq!(zigzag_decode(13), -7);
         assert_eq!(zigzag_decode(14), 7);
         assert_eq!(zigzag_decode(15), -8);
+
+        assert_eq!(zigzag_encode(0), 0);
+        assert_eq!(zigzag_encode(-1), 1);
+        assert_eq!(zigzag_encode(1), 2);
+        assert_eq!(zigzag_encode(-2), 3);
+        assert_eq!(zigzag_encode(2), 4);
+        assert_eq!(zigzag_encode(-3), 5);
+        assert_eq!(zigzag_encode(3), 6);
+        assert_eq!(zigzag_encode(-4), 7);
+        assert_eq!(zigzag_encode(4), 8);
+        assert_eq!(zigzag_encode(-5), 9);
+        assert_eq!(zigzag_encode(5), 10);
+        assert_eq!(zigzag_encode(-6), 11);
+        assert_eq!(zigzag_encode(6), 12);
+        assert_eq!(zigzag_encode(-7), 13);
+        assert_eq!(zigzag_encode(7), 14);
+        assert_eq!(zigzag_encode(-8), 15);
     }
 
     #[test]
     fn empty_polyline() {
         assert_eq!(PolylineIter::new(5, "").next(), None);
+        assert_eq!(encode(5, []), "");
+
         assert_eq!(PolylineIter::new(6, "").next(), None);
-        assert!(check_polyline(""));
+        assert_eq!(encode(6, []), "");
     }
 
     #[test]
     fn single_point() {
-        let polyline = "_p~iF~ps|U_";
-        assert!(check_polyline(polyline));
-        let mut iter = PolylineIter::new(5, polyline);
-        assert_eq!(iter.next(), Some((38.5, -120.2)));
-        assert_eq!(iter.next(), None);
+        assert_eq!(encode(5, &[(0.0, 0.0)]), "??");
+        assert_eq!(PolylineIter::new(5, "??").collect::<Vec<_>>(), [(0.0, 0.0)]);
+        assert_eq!(encode(6, &[(0.0, 0.0)]), "??");
+        assert_eq!(PolylineIter::new(6, "??").collect::<Vec<_>>(), [(0.0, 0.0)]);
 
-        let mut iter = PolylineIter::new(6, polyline);
-        assert_eq!(iter.next(), Some((3.85, -12.02)));
-        assert_eq!(iter.next(), None);
+        let point = (55.71218211778275, 13.21561509233427);
+        assert_eq!(encode(5, &[point]), "ch`sIsdtoA");
+        assert_eq!(
+            PolylineIter::new(5, "ch`sIsdtoA").collect::<Vec<_>>(),
+            [(55.71218, 13.21562)]
+        );
+        assert_eq!(encode(6, &[point]), "kzkgiB}vreX");
+        assert_eq!(
+            PolylineIter::new(6, "kzkgiB}vreX").collect::<Vec<_>>(),
+            [(55.712182, 13.215615)]
+        );
+        assert_eq!(encode(7, &[point]), "yp_se`@mnda{F");
+        assert_eq!(
+            PolylineIter::new(7, "yp_se`@mnda{F").collect::<Vec<_>>(),
+            [(55.7121821, 13.2156151)]
+        );
+
+        let point = (37.82070486887192, -122.47866012130189);
+        assert_eq!(encode(5, &[point]), "kzyeFrrpjV");
+        assert_eq!(
+            PolylineIter::new(5, "kzyeFrrpjV").collect::<Vec<_>>(),
+            [(37.82070, -122.47866)]
+        );
+        assert_eq!(encode(6, &[point]), "aqkcgAfcorhF");
+        assert_eq!(
+            PolylineIter::new(6, "aqkcgAfcorhF").collect::<Vec<_>>(),
+            [(37.820705, -122.478660)]
+        );
+
+        let point = (-54.906532713928094, -65.99208264367125);
+        assert_eq!(encode(5, &[point]), "x|bnInaxqK");
+        assert_eq!(
+            PolylineIter::new(5, "x|bnInaxqK").collect::<Vec<_>>(),
+            [(-54.90653, -65.99208)]
+        );
+        assert_eq!(encode(6, &[point]), "hifvgBdxyz|B");
+        assert_eq!(
+            PolylineIter::new(6, "hifvgBdxyz|B").collect::<Vec<_>>(),
+            [(-54.906533, -65.992083)]
+        );
+
+        let point = (-37.88209074375984, 144.79631245265494);
+        assert_eq!(encode(5, &[point]), "`zefF}owrZ");
+        assert_eq!(
+            PolylineIter::new(5, "`zefF}owrZ").collect::<Vec<_>>(),
+            [(-37.88209, 144.79631)]
+        );
+        assert_eq!(encode(6, &[point]), "tmcggAohtdsG");
+        assert_eq!(
+            PolylineIter::new(6, "tmcggAohtdsG").collect::<Vec<_>>(),
+            [(-37.882091, 144.796312)]
+        );
     }
 
     #[test]
@@ -191,9 +302,11 @@ mod tests {
         let polyline =
             "ch`sIsdtoAEa@^IKgCqAJa@Ic@A[C[CYEe@G[AMEyBs@kCg@qBIWDSL?~@@xABzAAD]FGoCAa@@?";
         assert_eq!(PolylineIter::new(5, polyline,).collect::<Vec<_>>(), points);
+        assert_eq!(encode(5, points), polyline);
 
         let polyline = "gzkgiBgwreX{@sI~HcBwBoi@sXvBsIcBgJSwGg@wGg@cG{@{JoAwGSkC{@ce@gOwj@oKsb@cBoFz@gEjC?~RRb[f@v[Sz@kHnAoA_l@SsIR?";
         assert_eq!(PolylineIter::new(6, polyline,).collect::<Vec<_>>(), points);
+        assert_eq!(encode(6, points), polyline);
     }
 
     #[test]
