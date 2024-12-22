@@ -2,6 +2,7 @@
 /// See https://developers.google.com/maps/documentation/utilities/polylinealgorithm
 ///
 /// ```
+/// use polyline_iter::PolylineIter;
 /// let iter = PolylineIter::new(5, "angrIk~inAgwDybH_|D_{KeoEwtLozFo`Gre@tcA");
 /// assert_eq!(
 ///     iter.collect::<Vec<_>>(),
