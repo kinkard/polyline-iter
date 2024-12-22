@@ -23,7 +23,7 @@ impl<'a> PolylineIter<'a> {
         let mut result = 0;
         for (i, &byte) in self.polyline.iter().enumerate() {
             let chunk = (byte as i32) - 63;
-            result |= (chunk & 0x1f) << i * 5;
+            result |= (chunk & 0x1f) << (i * 5);
             if chunk & 0x20 == 0 {
                 self.polyline = &self.polyline[i + 1..];
                 return Some(zigzag_decode(result as u32));
@@ -33,7 +33,7 @@ impl<'a> PolylineIter<'a> {
     }
 }
 
-impl<'a> Iterator for PolylineIter<'a> {
+impl Iterator for PolylineIter<'_> {
     type Item = (f64, f64);
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -43,7 +43,7 @@ impl<'a> Iterator for PolylineIter<'a> {
         self.lon += lon_change;
         let lat = self.lat as f64 / self.scale;
         let lon = self.lon as f64 / self.scale;
-        return Some((lat, lon));
+        Some((lat, lon))
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
