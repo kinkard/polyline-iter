@@ -72,14 +72,31 @@ impl Iterator for PolylineIter<'_> {
     }
 }
 
+/// Auxiliary trait that allows [`encode()`] to accept points by value and by reference.
+pub trait IntoLatLon {
+    /// Transforms the coordinate into a `(latitude, longitude)` format.
+    fn into_latlon(self) -> (f64, f64);
+}
+impl IntoLatLon for (f64, f64) {
+    fn into_latlon(self) -> (f64, f64) {
+        self
+    }
+}
+impl IntoLatLon for &(f64, f64) {
+    fn into_latlon(self) -> (f64, f64) {
+        *self
+    }
+}
+
 /// Encodes a sequence of points into a polyline with the given precision.
 ///
 /// ```
 /// assert_eq!(polyline_iter::encode(5, &[(55.58513, 12.99958), (55.61461, 13.04627)]),"angrIk~inAgwDybH");
 /// ```
-pub fn encode<'a, It>(precision: u8, points: It) -> String
+pub fn encode<It, P>(precision: u8, points: It) -> String
 where
-    It: IntoIterator<Item = &'a (f64, f64)>,
+    It: IntoIterator<Item = P>,
+    P: IntoLatLon,
 {
     assert!(precision <= 7, "i32 can hold up to 180 * 10^7");
 
@@ -88,13 +105,14 @@ where
 
     let mut prev = (0.0, 0.0);
     for point in points {
-        let lat_change = ((point.0 - prev.0) * scale).round() as i32;
-        let lon_change = ((point.1 - prev.1) * scale).round() as i32;
+        let latlon = point.into_latlon();
+        let lat_change = ((latlon.0 - prev.0) * scale).round() as i32;
+        let lon_change = ((latlon.1 - prev.1) * scale).round() as i32;
 
         varint_encode(zigzag_encode(lat_change), &mut result);
         varint_encode(zigzag_encode(lon_change), &mut result);
 
-        prev = *point;
+        prev = latlon;
     }
     result
 }
@@ -182,10 +200,27 @@ mod tests {
     #[test]
     fn empty_polyline() {
         assert_eq!(PolylineIter::new(5, "").next(), None);
-        assert_eq!(encode(5, []), "");
+        assert_eq!(encode(5, &[]), "");
 
         assert_eq!(PolylineIter::new(6, "").next(), None);
-        assert_eq!(encode(6, []), "");
+        assert_eq!(encode(6, &[]), "");
+    }
+
+    // Check that [`encode()`] can accept points by value and by reference.
+    #[test]
+    fn encode_by_ref_and_value() {
+        let point = (0.0, 0.0);
+        assert_eq!(encode(6, [point]), "??");
+        assert_eq!(encode(6, [&point]), "??");
+        assert_eq!(encode(6, &[point]), "??");
+
+        let points = vec![point];
+        assert_eq!(encode(6, points.iter()), "??");
+        assert_eq!(encode(6, points.clone()), "??");
+        assert_eq!(encode(6, points.into_iter()), "??");
+
+        assert_eq!(encode(6, std::iter::once(point)), "??");
+        assert_eq!(encode(6, std::iter::once(&point)), "??");
     }
 
     #[test]
@@ -262,6 +297,7 @@ mod tests {
         assert_eq!(iter.next(), Some((55.71222, 13.21244)));
         assert_eq!(iter.next(), None);
 
+        // If polyline is decoded with wrong precision, the points will be x10 times smaller or bigger.
         let mut iter = PolylineIter::new(6, polyline);
         assert_eq!(iter.next(), Some((5.558513, 1.299958)));
         assert_eq!(iter.next(), Some((5.561461, 1.304627)));
@@ -271,42 +307,24 @@ mod tests {
         assert_eq!(iter.next(), Some((5.571222, 1.321244)));
         assert_eq!(iter.next(), None);
 
-        let points = &[
-            (55.71218, 13.21562),
-            (55.71221, 13.21579),
-            (55.71205, 13.21584),
-            (55.71211, 13.21652),
-            (55.71252, 13.21646),
-            (55.71269, 13.21651),
-            (55.71287, 13.21652),
-            (55.71301, 13.21654),
-            (55.71315, 13.21656),
-            (55.71328, 13.21659),
-            (55.71347, 13.21663),
-            (55.71361, 13.21664),
-            (55.71368, 13.21667),
-            (55.71429, 13.21693),
-            (55.71499, 13.21713),
-            (55.71556, 13.21718),
-            (55.71568, 13.21715),
-            (55.71578, 13.21708),
-            (55.71578, 13.21676),
-            (55.71577, 13.21631),
-            (55.71575, 13.21585),
-            (55.71576, 13.21582),
-            (55.71591, 13.21578),
-            (55.71595, 13.21650),
-            (55.71596, 13.21667),
-            (55.71595, 13.21667),
-        ];
-        let polyline =
-            "ch`sIsdtoAEa@^IKgCqAJa@Ic@A[C[CYEe@G[AMEyBs@kCg@qBIWDSL?~@@xABzAAD]FGoCAa@@?";
-        assert_eq!(PolylineIter::new(5, polyline,).collect::<Vec<_>>(), points);
-        assert_eq!(encode(5, points), polyline);
-
+        // Forward and backward transcoding should give the same result
         let polyline = "gzkgiBgwreX{@sI~HcBwBoi@sXvBsIcBgJSwGg@wGg@cG{@{JoAwGSkC{@ce@gOwj@oKsb@cBoFz@gEjC?~RRb[f@v[Sz@kHnAoA_l@SsIR?";
-        assert_eq!(PolylineIter::new(6, polyline,).collect::<Vec<_>>(), points);
-        assert_eq!(encode(6, points), polyline);
+        assert_eq!(encode(6, PolylineIter::new(6, polyline)), polyline);
+
+        // Transcoding polyline to another precision
+        assert_eq!(
+            encode(5, PolylineIter::new(6, polyline)),
+            "ch`sIsdtoAEa@^IKgCqAJa@Ic@A[C[CYEe@G[AMEyBs@kCg@qBIWDSL?~@@xABzAAD]FGoCAa@@?"
+        );
+
+        assert_eq!(
+            encode(
+                6,
+                // decoded with wrong precision, but then corrected by `* 10.0`
+                PolylineIter::new(7, polyline).map(|(lat, lon)| (lat * 10.0, lon * 10.0))
+            ),
+            polyline
+        );
     }
 
     #[test]

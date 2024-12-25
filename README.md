@@ -33,6 +33,9 @@ assert_eq!(
 
 // If the points are not needed, the iterator can be used directly
 assert_eq!(PolylineIter::new(5, "angrIk~inAgwDybH_|D_{KeoEwtLozFo`Gre@tcA").count(), 6);
+
+// Transcoding into a polyline with a different precision
+let polyline6 = polyline_iter::encode(6, PolylineIter::new(5, "angrIk~inAgwDybH_|D_{KeoEwtLozFo`Gre@tcA"));
 ```
 
 ## License
