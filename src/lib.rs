@@ -328,6 +328,12 @@ mod tests {
     }
 
     #[test]
+    #[should_panic]
+    fn bad_precision() {
+        encode(8, &[]);
+    }
+
+    #[test]
     fn broken_string() {
         // Last point is missing a lon change, so the whole points will be skipped.
         let polyline = "_p~iF~ps|U_ulLnnqC_mqNvxq";
