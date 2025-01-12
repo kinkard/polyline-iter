@@ -101,7 +101,7 @@ where
     assert!(precision <= 7, "i32 can hold up to 180 * 10^7");
 
     let scale = 10.0_f64.powi(precision as i32);
-    let mut result = String::new();
+    let mut result = String::with_capacity(16);
 
     let mut prev = (0.0, 0.0);
     for point in points {
