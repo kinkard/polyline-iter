@@ -4,6 +4,7 @@ description = "Zero-dependency iterator-based Google Encoded Polyline encoder an
 version = "0.1.0"
 repository = "https://github.com/kinkard/polyline-iter"
 readme = "README.md"
+include = ["**/*.rs"]
 keywords = ["polyline", "geo", "maps"]
 edition = "2021"
 authors = ["Stepan Kizim <stsiapan.kizim@gmail.com>"]
