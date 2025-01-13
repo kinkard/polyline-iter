@@ -1,6 +1,10 @@
 [package]
 name = "polyline-iter"
+description = "Zero-dependency iterator-based Google Encoded Polyline encoder and decoder"
 version = "0.1.0"
+repository = "https://github.com/kinkard/polyline-iter"
+readme = "README.md"
+keywords = ["polyline", "geo", "maps"]
 edition = "2021"
 authors = ["Stepan Kizim <stsiapan.kizim@gmail.com>"]
 license = "MIT OR Apache-2.0"
