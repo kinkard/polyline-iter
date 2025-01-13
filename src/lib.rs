@@ -18,7 +18,9 @@
 /// ```
 pub struct PolylineIter<'a> {
     polyline: &'a [u8],
+    /// Last processed latitude, multiplied by the scale.
     lat: i32,
+    /// Last processed longitude, multiplied by the scale.
     lon: i32,
     scale: f64,
 }
@@ -37,14 +39,15 @@ impl<'a> PolylineIter<'a> {
     }
 
     #[inline(always)]
-    fn decode_segment(&mut self) -> Option<i32> {
+    fn varint_decode(&mut self) -> Option<u32> {
         let mut result = 0;
-        for (i, &byte) in self.polyline.iter().enumerate() {
-            let chunk = (byte as i32) - 63;
+        for i in 0..self.polyline.len() {
+            // Casting here to i32 here to provide bad value instead of overflow panicking on bad input.
+            let chunk = (self.polyline[i] as i32) - 63;
             result |= (chunk & 0x1f) << (i * 5);
             if chunk & 0x20 == 0 {
                 self.polyline = &self.polyline[i + 1..];
-                return Some(zigzag_decode(result as u32));
+                return Some(result as u32);
             }
         }
         None
@@ -55,10 +58,10 @@ impl Iterator for PolylineIter<'_> {
     type Item = (f64, f64);
 
     fn next(&mut self) -> Option<Self::Item> {
-        let lat_change = self.decode_segment()?;
-        let lon_change = self.decode_segment()?;
-        self.lat += lat_change;
-        self.lon += lon_change;
+        let lat_change = self.varint_decode()?;
+        let lon_change = self.varint_decode()?;
+        self.lat += zigzag_decode(lat_change);
+        self.lon += zigzag_decode(lon_change);
         let lat = self.lat as f64 / self.scale;
         let lon = self.lon as f64 / self.scale;
         Some((lat, lon))
