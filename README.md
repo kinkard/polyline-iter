@@ -10,7 +10,7 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-polyline-iter = "0.1"
+polyline-iter = "0.2"
 ```
 
 ## Example
