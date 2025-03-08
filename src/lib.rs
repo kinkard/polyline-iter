@@ -3,18 +3,42 @@
 ///
 /// ```
 /// use polyline_iter::PolylineIter;
-/// let iter = PolylineIter::new(5, "angrIk~inAgwDybH_|D_{KeoEwtLozFo`Gre@tcA");
+/// let iter = PolylineIter::new(6, "avs_iB}xlxWissBw|zEu``AsxgCyoaAm_z@");
 /// assert_eq!(
 ///     iter.collect::<Vec<_>>(),
 ///     vec![
-///         (55.58513, 12.99958),
-///         (55.61461, 13.04627),
-///         (55.64485, 13.11219),
-///         (55.67816, 13.18223),
-///         (55.71840, 13.22343),
-///         (55.71222, 13.21244),
+///         (55.585137, 12.999583),
+///         (55.644854, 13.112187),
+///         (55.678161, 13.182229),
+///         (55.712222, 13.212444),
 ///     ]
 /// );
+///
+/// // If the points are not needed, the iterator can be used directly
+/// assert_eq!(PolylineIter::new(5, "avs_iB}xlxWissBw|zEu``AsxgCyoaAm_z@").count(), 4);
+///
+/// // Iterator approach allows to transcode polyline to another precision without intermediate allocations.
+/// let polyline5 = polyline_iter::encode(5, PolylineIter::new(6, "avs_iB}xlxWissBw|zEu``AsxgCyoaAm_z@"));
+/// assert_eq!(polyline5, "cngrIk~inAgtJw~TeoEwtL{sE{{D");
+/// assert_eq!(
+///     PolylineIter::new(5, &polyline5).collect::<Vec<_>>(),
+///     vec![
+///         (55.58514, 12.99958),
+///         (55.64486, 13.11218),
+///         (55.67817, 13.18222),
+///         (55.71223, 13.21244)
+///     ],
+/// );
+///
+/// // Keeping all the power of working with slices
+/// let points = vec![
+///     (55.58513, 12.99958),
+///     (55.61461, 13.04627),
+///     (55.64485, 13.11219),
+///     (55.67816, 13.18223),
+///     (55.71840, 13.22343),
+/// ];
+/// assert_eq!(polyline_iter::encode(5, points[1..3].iter().copied()), "ifmrIebsnA_|D_{K");
 /// ```
 pub struct PolylineIter<'a> {
     polyline: &'a [u8],
@@ -75,31 +99,14 @@ impl Iterator for PolylineIter<'_> {
     }
 }
 
-/// Auxiliary trait that allows [`encode()`] to accept points by value and by reference.
-pub trait IntoLatLon {
-    /// Transforms the coordinate into a `(latitude, longitude)` format.
-    fn into_latlon(self) -> (f64, f64);
-}
-impl IntoLatLon for (f64, f64) {
-    fn into_latlon(self) -> (f64, f64) {
-        self
-    }
-}
-impl IntoLatLon for &(f64, f64) {
-    fn into_latlon(self) -> (f64, f64) {
-        *self
-    }
-}
-
 /// Encodes a sequence of points into a polyline with the given precision.
 ///
 /// ```
-/// assert_eq!(polyline_iter::encode(5, &[(55.58513, 12.99958), (55.61461, 13.04627)]),"angrIk~inAgwDybH");
+/// assert_eq!(polyline_iter::encode(5, [(55.58513, 12.99958), (55.61461, 13.04627)]),"angrIk~inAgwDybH");
 /// ```
-pub fn encode<It, P>(precision: u8, points: It) -> String
+pub fn encode<It>(precision: u8, points: It) -> String
 where
-    It: IntoIterator<Item = P>,
-    P: IntoLatLon,
+    It: IntoIterator<Item = (f64, f64)>,
 {
     assert!(precision <= 7, "i32 can hold up to 180 * 10^7");
 
@@ -108,14 +115,13 @@ where
 
     let mut prev = (0.0, 0.0);
     for point in points {
-        let latlon = point.into_latlon();
-        let lat_change = ((latlon.0 - prev.0) * scale).round() as i32;
-        let lon_change = ((latlon.1 - prev.1) * scale).round() as i32;
+        let lat_change = ((point.0 - prev.0) * scale).round() as i32;
+        let lon_change = ((point.1 - prev.1) * scale).round() as i32;
 
         varint_encode(zigzag_encode(lat_change), &mut result);
         varint_encode(zigzag_encode(lon_change), &mut result);
 
-        prev = latlon;
+        prev = point;
     }
     result
 }
@@ -203,84 +209,67 @@ mod tests {
     #[test]
     fn empty_polyline() {
         assert_eq!(PolylineIter::new(5, "").next(), None);
-        assert_eq!(encode(5, &[]), "");
+        assert_eq!(encode(5, []), "");
 
         assert_eq!(PolylineIter::new(6, "").next(), None);
-        assert_eq!(encode(6, &[]), "");
-    }
-
-    // Check that [`encode()`] can accept points by value and by reference.
-    #[test]
-    fn encode_by_ref_and_value() {
-        let point = (0.0, 0.0);
-        assert_eq!(encode(6, [point]), "??");
-        assert_eq!(encode(6, [&point]), "??");
-        assert_eq!(encode(6, &[point]), "??");
-
-        let points = vec![point];
-        assert_eq!(encode(6, points.iter()), "??");
-        assert_eq!(encode(6, points.clone()), "??");
-        assert_eq!(encode(6, points.into_iter()), "??");
-
-        assert_eq!(encode(6, std::iter::once(point)), "??");
-        assert_eq!(encode(6, std::iter::once(&point)), "??");
+        assert_eq!(encode(6, []), "");
     }
 
     #[test]
     fn single_point() {
-        assert_eq!(encode(5, &[(0.0, 0.0)]), "??");
+        assert_eq!(encode(5, [(0.0, 0.0)]), "??");
         assert_eq!(PolylineIter::new(5, "??").collect::<Vec<_>>(), [(0.0, 0.0)]);
-        assert_eq!(encode(6, &[(0.0, 0.0)]), "??");
+        assert_eq!(encode(6, [(0.0, 0.0)]), "??");
         assert_eq!(PolylineIter::new(6, "??").collect::<Vec<_>>(), [(0.0, 0.0)]);
 
         let point = (55.71218211778275, 13.21561509233427);
-        assert_eq!(encode(5, &[point]), "ch`sIsdtoA");
+        assert_eq!(encode(5, [point]), "ch`sIsdtoA");
         assert_eq!(
             PolylineIter::new(5, "ch`sIsdtoA").collect::<Vec<_>>(),
             [(55.71218, 13.21562)]
         );
-        assert_eq!(encode(6, &[point]), "kzkgiB}vreX");
+        assert_eq!(encode(6, [point]), "kzkgiB}vreX");
         assert_eq!(
             PolylineIter::new(6, "kzkgiB}vreX").collect::<Vec<_>>(),
             [(55.712182, 13.215615)]
         );
-        assert_eq!(encode(7, &[point]), "yp_se`@mnda{F");
+        assert_eq!(encode(7, [point]), "yp_se`@mnda{F");
         assert_eq!(
             PolylineIter::new(7, "yp_se`@mnda{F").collect::<Vec<_>>(),
             [(55.7121821, 13.2156151)]
         );
 
         let point = (37.82070486887192, -122.47866012130189);
-        assert_eq!(encode(5, &[point]), "kzyeFrrpjV");
+        assert_eq!(encode(5, [point]), "kzyeFrrpjV");
         assert_eq!(
             PolylineIter::new(5, "kzyeFrrpjV").collect::<Vec<_>>(),
             [(37.82070, -122.47866)]
         );
-        assert_eq!(encode(6, &[point]), "aqkcgAfcorhF");
+        assert_eq!(encode(6, [point]), "aqkcgAfcorhF");
         assert_eq!(
             PolylineIter::new(6, "aqkcgAfcorhF").collect::<Vec<_>>(),
             [(37.820705, -122.478660)]
         );
 
         let point = (-54.906532713928094, -65.99208264367125);
-        assert_eq!(encode(5, &[point]), "x|bnInaxqK");
+        assert_eq!(encode(5, [point]), "x|bnInaxqK");
         assert_eq!(
             PolylineIter::new(5, "x|bnInaxqK").collect::<Vec<_>>(),
             [(-54.90653, -65.99208)]
         );
-        assert_eq!(encode(6, &[point]), "hifvgBdxyz|B");
+        assert_eq!(encode(6, [point]), "hifvgBdxyz|B");
         assert_eq!(
             PolylineIter::new(6, "hifvgBdxyz|B").collect::<Vec<_>>(),
             [(-54.906533, -65.992083)]
         );
 
         let point = (-37.88209074375984, 144.79631245265494);
-        assert_eq!(encode(5, &[point]), "`zefF}owrZ");
+        assert_eq!(encode(5, [point]), "`zefF}owrZ");
         assert_eq!(
             PolylineIter::new(5, "`zefF}owrZ").collect::<Vec<_>>(),
             [(-37.88209, 144.79631)]
         );
-        assert_eq!(encode(6, &[point]), "tmcggAohtdsG");
+        assert_eq!(encode(6, [point]), "tmcggAohtdsG");
         assert_eq!(
             PolylineIter::new(6, "tmcggAohtdsG").collect::<Vec<_>>(),
             [(-37.882091, 144.796312)]
@@ -333,7 +322,7 @@ mod tests {
     #[test]
     #[should_panic]
     fn bad_precision() {
-        encode(8, &[]);
+        encode(8, []);
     }
 
     #[test]

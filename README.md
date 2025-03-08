@@ -10,7 +10,7 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-polyline-iter = "0.2"
+polyline-iter = "0.3"
 ```
 
 ## Example
@@ -18,24 +18,42 @@ polyline-iter = "0.2"
 ```rust
 use polyline_iter::PolylineIter;
 
-let iter = PolylineIter::new(5, "angrIk~inAgwDybH_|D_{KeoEwtLozFo`Gre@tcA");
+let iter = PolylineIter::new(6, "avs_iB}xlxWissBw|zEu``AsxgCyoaAm_z@");
 assert_eq!(
     iter.collect::<Vec<_>>(),
     vec![
-        (55.58513, 12.99958),
-        (55.61461, 13.04627),
-        (55.64485, 13.11219),
-        (55.67816, 13.18223),
-        (55.71840, 13.22343),
-        (55.71222, 13.21244),
+        (55.585137, 12.999583),
+        (55.644854, 13.112187),
+        (55.678161, 13.182229),
+        (55.712222, 13.212444),
     ]
 );
 
 // If the points are not needed, the iterator can be used directly
-assert_eq!(PolylineIter::new(5, "angrIk~inAgwDybH_|D_{KeoEwtLozFo`Gre@tcA").count(), 6);
+assert_eq!(PolylineIter::new(5, "avs_iB}xlxWissBw|zEu``AsxgCyoaAm_z@").count(), 4);
 
-// Transcoding into a polyline with a different precision
-let polyline6 = polyline_iter::encode(6, PolylineIter::new(5, "angrIk~inAgwDybH_|D_{KeoEwtLozFo`Gre@tcA"));
+// Iterator approach allows to transcode polyline to another precision without intermediate allocations.
+let polyline5 = polyline_iter::encode(5, PolylineIter::new(6, "avs_iB}xlxWissBw|zEu``AsxgCyoaAm_z@"));
+assert_eq!(polyline5, "cngrIk~inAgtJw~TeoEwtL{sE{{D");
+assert_eq!(
+    PolylineIter::new(5, &polyline5).collect::<Vec<_>>(),
+    vec![
+        (55.58514, 12.99958),
+        (55.64486, 13.11218),
+        (55.67817, 13.18222),
+        (55.71223, 13.21244)
+    ],
+);
+
+// Keeping all the power of working with slices
+let points = vec![
+    (55.58513, 12.99958),
+    (55.61461, 13.04627),
+    (55.64485, 13.11219),
+    (55.67816, 13.18223),
+    (55.71840, 13.22343),
+];
+assert_eq!(polyline_iter::encode(5, points[1..3].iter().copied()), "ifmrIebsnA_|D_{K");
 ```
 
 ## License

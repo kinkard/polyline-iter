@@ -1,6 +1,6 @@
 [package]
 name = "polyline-iter"
-version = "0.2.1"
+version = "0.3.0"
 edition = "2024"
 rust-version = "1.85"
 description = "Zero-dependency iterator-based Google Encoded Polyline encoder and decoder"
