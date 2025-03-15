@@ -165,6 +165,7 @@ fn varint_encode(mut value: u32, buffer: &mut String) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use pretty_assertions::assert_eq;
 
     /// Checks if the polyline contains only valid characters and ends with a complete point.
     fn check_polyline(polyline: &str) -> bool {

@@ -12,3 +12,11 @@ include = ["**/*.rs"]
 
 [dependencies]
 # No dependencies
+
+[dev-dependencies]
+criterion = "0.5"
+pretty_assertions = "1"
+
+[[bench]]
+name = "polyline_benchmarks"
+harness = false
