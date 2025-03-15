@@ -8,7 +8,7 @@ readme = "README.md"
 repository = "https://github.com/kinkard/polyline-iter"
 license = "MIT OR Apache-2.0"
 keywords = ["polyline", "geo", "maps"]
-include = ["**/*.rs"]
+include = ["src/*.rs"]
 
 [dependencies]
 # No dependencies
