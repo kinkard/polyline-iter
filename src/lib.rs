@@ -1,5 +1,11 @@
-/// Iterator over points, decoded from a polyline5 or polyline6.
-/// See https://developers.google.com/maps/documentation/utilities/polylinealgorithm
+/// Iterator over geographic coordinates (latitude/longitude pairs) decoded from a polyline-encoded string.
+///
+/// Supports both formats:
+/// - polyline5: Google Maps standard format with 5 decimal places precision
+/// - polyline6: Higher precision format with 6 decimal places, used by routing engines like OSRM and Valhalla
+///
+/// For details on the encoding algorithm, see:
+/// https://developers.google.com/maps/documentation/utilities/polylinealgorithm
 ///
 /// ```
 /// use polyline_iter::PolylineIter;
@@ -29,16 +35,6 @@
 ///         (55.71223, 13.21244)
 ///     ],
 /// );
-///
-/// // Keeping all the power of working with slices
-/// let points = vec![
-///     (55.58513, 12.99958),
-///     (55.61461, 13.04627),
-///     (55.64485, 13.11219),
-///     (55.67816, 13.18223),
-///     (55.71840, 13.22343),
-/// ];
-/// assert_eq!(polyline_iter::encode(5, points[1..3].iter().copied()), "ifmrIebsnA_|D_{K");
 /// ```
 pub struct PolylineIter<'a> {
     polyline: &'a [u8],
@@ -99,10 +95,27 @@ impl Iterator for PolylineIter<'_> {
     }
 }
 
-/// Encodes a sequence of points into a polyline with the given precision.
+/// Encodes a sequence of points (latitude, longitude pairs) into a polyline string with the given precision.
+/// The precision parameter specifies the number of decimal places in the coordinates (5 for polyline5,
+/// 6 for polyline6), with a maximum value of 7 which corresponds to ~1cm precision at the equator.
 ///
 /// ```
+/// // Encode an array of latitude/longitude coordinates with precision 5 (standard for Google Maps)
 /// assert_eq!(polyline_iter::encode(5, [(55.58513, 12.99958), (55.61461, 13.04627)]),"angrIk~inAgwDybH");
+///
+/// // `encode()` accepts any iterator that produce (lat,lon)
+/// let iter = (1..5).map(|i| (55.5 + 0.1 * i as f64, 12.9 + 0.1 * i as f64));
+/// assert_eq!(polyline_iter::encode(5, iter), "_kjrI_ajnA_pR_pR_pR_pR_pR_pR");
+///
+/// // And it can be used with slices as well (convert iter of references to iter of values with `copied()`)
+/// let points = vec![
+///     (55.58513, 12.99958),
+///     (55.61461, 13.04627),
+///     (55.64485, 13.11219),
+///     (55.67816, 13.18223),
+///     (55.71840, 13.22343),
+/// ];
+/// assert_eq!(polyline_iter::encode(5, points[1..3].iter().copied()), "ifmrIebsnA_|D_{K");
 /// ```
 pub fn encode<It>(precision: u8, points: It) -> String
 where
