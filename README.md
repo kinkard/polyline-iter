@@ -2,7 +2,7 @@
 
 Zero-dependency Rust crate for encoding and decoding [Google's polyline format](https://developers.google.com/maps/documentation/utilities/polylinealgorithm).
 
-Compared to the [georust/polyline](https://github.com/georust/polyline) crate, the `polyline-iter` decodes polyline into an iterator over points instead of vector, which is benefitial when only a single iteration over the polyline is needed. And in such cases it performs twice as fast as the `georust/polyline` crate and has no hidden allocations.
+Compared to the [georust/polyline](https://github.com/georust/polyline) crate, the `polyline-iter` decodes polyline into an iterator over points instead of vector, which is benefitial when only a single iteration over the polyline is needed. And in such cases it performs twice as fast as the `georust/polyline` crate (check `cargo bench` for exact numbers) and has no hidden allocations.
 
 ## Usage
 

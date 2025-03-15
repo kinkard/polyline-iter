@@ -19,6 +19,41 @@ fn bench_polyline_decode(c: &mut Criterion) {
     });
 }
 
+fn bench_georust_polyline_decode(c: &mut Criterion) {
+    c.bench_function("georust_decode_short_polyline5", |b| {
+        b.iter(|| {
+            black_box(
+                polyline::decode_polyline(black_box(SHORT_POLYLINE5), 5)
+                    .unwrap()
+                    .into_inner()
+                    .len(),
+            )
+        });
+    });
+
+    c.bench_function("georust_decode_medium_polyline6", |b| {
+        b.iter(|| {
+            black_box(
+                polyline::decode_polyline(black_box(MEDIUM_POLYLINE6), 6)
+                    .unwrap()
+                    .into_inner()
+                    .len(),
+            )
+        });
+    });
+
+    c.bench_function("georust_decode_long_polyline6", |b| {
+        b.iter(|| {
+            black_box(
+                polyline::decode_polyline(black_box(LONG_POLYLINE6), 6)
+                    .unwrap()
+                    .into_inner()
+                    .len(),
+            )
+        });
+    });
+}
+
 fn bench_polyline_encode(c: &mut Criterion) {
     let short_points = PolylineIter::new(5, black_box(SHORT_POLYLINE5)).collect::<Vec<_>>();
     c.bench_function("encode_short_polyline5", |b| {
@@ -47,14 +82,27 @@ fn bench_polyline_encode(c: &mut Criterion) {
 
 fn bench_polyline_transcode(c: &mut Criterion) {
     c.bench_function("transcode_polyline6_to_polyline5", |b| {
-        b.iter(|| black_box(encode(5, PolylineIter::new(6, LONG_POLYLINE6))));
+        b.iter(|| black_box(encode(5, PolylineIter::new(6, black_box(LONG_POLYLINE6)))));
+    });
+}
+
+fn bench_georust_polyline_transcode(c: &mut Criterion) {
+    c.bench_function("georust_transcode_polyline6_to_polyline5", |b| {
+        b.iter(|| {
+            black_box(polyline::encode_coordinates(
+                polyline::decode_polyline(black_box(LONG_POLYLINE6), 6).unwrap(),
+                5,
+            ))
+        });
     });
 }
 
 criterion_group!(
     benches,
     bench_polyline_decode,
+    bench_georust_polyline_decode,
     bench_polyline_encode,
-    bench_polyline_transcode
+    bench_polyline_transcode,
+    bench_georust_polyline_transcode,
 );
 criterion_main!(benches);
