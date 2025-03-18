@@ -72,6 +72,15 @@ impl<'a> PolylineIter<'a> {
         }
         None
     }
+
+    /// O(n) operation to count the number of points in the polyline.
+    fn len(&self) -> usize {
+        self.polyline
+            .iter()
+            .filter(|&&byte| (byte as i8 - 63) & 0x20 == 0)
+            .count()
+            / 2 // Each point has 2 numbers
+    }
 }
 
 impl Iterator for PolylineIter<'_> {
@@ -92,6 +101,10 @@ impl Iterator for PolylineIter<'_> {
         // And at most polyline.len() / 2 points if each number (2 per point) is encoded only by a single char.
         let len = self.polyline.len();
         (len / 12, Some(len / 2))
+    }
+
+    fn count(self) -> usize {
+        self.len()
     }
 }
 
@@ -294,6 +307,8 @@ mod tests {
     fn multiple_points() {
         let polyline = "angrIk~inAgwDybH_|D_{KeoEwtLozFo`Gre@tcA";
         assert!(check_polyline(polyline));
+        assert_eq!(PolylineIter::new(5, polyline).count(), 6);
+
         let mut iter = PolylineIter::new(5, polyline);
         assert_eq!(iter.next(), Some((55.58513, 12.99958)));
         assert_eq!(iter.next(), Some((55.61461, 13.04627)));
