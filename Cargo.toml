@@ -14,9 +14,10 @@ include = ["src/*.rs"]
 # No dependencies
 
 [dev-dependencies]
-criterion = "0.5"
+criterion = { version = "0.6", default-features = false }
 pretty_assertions = "1"
-polyline = "0.11" # To bench against https://github.com/georust/polyline
+# To bench against https://github.com/georust/polyline
+polyline = "0.11"
 
 [[bench]]
 name = "polyline_benchmarks"
