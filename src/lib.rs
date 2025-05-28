@@ -130,10 +130,7 @@ impl Iterator for PolylineIter<'_> {
 /// ];
 /// assert_eq!(polyline_iter::encode(5, points[1..3].iter().copied()), "ifmrIebsnA_|D_{K");
 /// ```
-pub fn encode<It>(precision: u8, points: It) -> String
-where
-    It: IntoIterator<Item = (f64, f64)>,
-{
+pub fn encode<It: IntoIterator<Item = (f64, f64)>>(precision: u8, points: It) -> String {
     assert!(precision <= 7, "i32 can hold up to 180 * 10^7");
 
     let scale = 10.0_f64.powi(precision as i32);
