@@ -1,5 +1,5 @@
 use criterion::{Criterion, criterion_group, criterion_main};
-use polyline_iter::{PolylineIter, encode};
+use polyline_iter::{decode, encode};
 use std::hint::black_box;
 
 const SHORT_POLYLINE5: &str = "angrIk~inAgwDybH";
@@ -9,29 +9,13 @@ const LONG_POLYLINE6: &str = "zqkm^fqw|`CdFAlAXbBlAfAvAlAxAtA`CJdHb@fR@pG`EEhg@o
 fn bench_polyline_decode(c: &mut Criterion) {
     // `PolylineIter` has optimized `count()` method, so we should use `fold()` to compare with georust
     c.bench_function("decode_short_polyline5", |b| {
-        b.iter(|| {
-            black_box(PolylineIter::new(5, black_box(SHORT_POLYLINE5)).fold(0, |acc, _| acc + 1))
-        });
+        b.iter(|| black_box(decode(5, black_box(SHORT_POLYLINE5)).fold(0, |acc, _| acc + 1)));
     });
     c.bench_function("decode_medium_polyline6", |b| {
-        b.iter(|| {
-            black_box(PolylineIter::new(6, black_box(MEDIUM_POLYLINE6)).fold(0, |acc, _| acc + 1))
-        });
+        b.iter(|| black_box(decode(6, black_box(MEDIUM_POLYLINE6)).fold(0, |acc, _| acc + 1)));
     });
     c.bench_function("decode_long_polyline6", |b| {
-        b.iter(|| {
-            black_box(PolylineIter::new(6, black_box(LONG_POLYLINE6)).fold(0, |acc, _| acc + 1))
-        });
-    });
-
-    c.bench_function("decode_count_short_polyline5", |b| {
-        b.iter(|| black_box(PolylineIter::new(5, black_box(SHORT_POLYLINE5)).count()));
-    });
-    c.bench_function("decode_count_medium_polyline6", |b| {
-        b.iter(|| black_box(PolylineIter::new(6, black_box(MEDIUM_POLYLINE6)).count()));
-    });
-    c.bench_function("decode_count_long_polyline6", |b| {
-        b.iter(|| black_box(PolylineIter::new(6, black_box(LONG_POLYLINE6)).count()));
+        b.iter(|| black_box(decode(6, black_box(LONG_POLYLINE6)).fold(0, |acc, _| acc + 1)));
     });
 }
 
@@ -69,7 +53,7 @@ fn bench_georust_polyline_decode(c: &mut Criterion) {
 }
 
 fn bench_polyline_encode(c: &mut Criterion) {
-    let short_points = PolylineIter::new(5, black_box(SHORT_POLYLINE5)).collect::<Vec<_>>();
+    let short_points = decode(5, black_box(SHORT_POLYLINE5)).collect::<Vec<_>>();
     c.bench_function("encode_short_polyline5", |b| {
         b.iter(|| black_box(encode(5, short_points.clone())));
     });
@@ -77,7 +61,7 @@ fn bench_polyline_encode(c: &mut Criterion) {
         b.iter(|| black_box(encode(6, short_points.clone())));
     });
 
-    let medium_points = PolylineIter::new(5, black_box(MEDIUM_POLYLINE6)).collect::<Vec<_>>();
+    let medium_points = decode(5, black_box(MEDIUM_POLYLINE6)).collect::<Vec<_>>();
     c.bench_function("encode_medium_polyline5", |b| {
         b.iter(|| black_box(encode(5, medium_points.clone())));
     });
@@ -85,7 +69,7 @@ fn bench_polyline_encode(c: &mut Criterion) {
         b.iter(|| black_box(encode(6, medium_points.clone())));
     });
 
-    let long_points = PolylineIter::new(6, black_box(LONG_POLYLINE6)).collect::<Vec<_>>();
+    let long_points = decode(6, black_box(LONG_POLYLINE6)).collect::<Vec<_>>();
     c.bench_function("encode_long_polyline5", |b| {
         b.iter(|| black_box(encode(5, long_points.clone())));
     });
@@ -96,10 +80,10 @@ fn bench_polyline_encode(c: &mut Criterion) {
 
 fn bench_polyline_transcode(c: &mut Criterion) {
     c.bench_function("transcode_medium_polyline6_to_polyline5", |b| {
-        b.iter(|| black_box(encode(5, PolylineIter::new(6, black_box(MEDIUM_POLYLINE6)))));
+        b.iter(|| black_box(encode(5, decode(6, black_box(MEDIUM_POLYLINE6)))));
     });
     c.bench_function("transcode_long_polyline6_to_polyline5", |b| {
-        b.iter(|| black_box(encode(5, PolylineIter::new(6, black_box(LONG_POLYLINE6)))));
+        b.iter(|| black_box(encode(5, decode(6, black_box(LONG_POLYLINE6)))));
     });
 }
 
@@ -122,6 +106,28 @@ fn bench_georust_polyline_transcode(c: &mut Criterion) {
     });
 }
 
+fn bench_polyline_iter_methods(c: &mut Criterion) {
+    c.bench_function("iter_count_short_polyline5", |b| {
+        b.iter(|| black_box(decode(5, black_box(SHORT_POLYLINE5)).count()));
+    });
+    c.bench_function("iter_count_medium_polyline6", |b| {
+        b.iter(|| black_box(decode(6, black_box(MEDIUM_POLYLINE6)).count()));
+    });
+    c.bench_function("iter_count_long_polyline6", |b| {
+        b.iter(|| black_box(decode(6, black_box(LONG_POLYLINE6)).count()));
+    });
+
+    c.bench_function("iter_is_empty_short_polyline5", |b| {
+        b.iter(|| black_box(decode(5, black_box(SHORT_POLYLINE5)).is_empty()));
+    });
+    c.bench_function("iter_is_empty_medium_polyline6", |b| {
+        b.iter(|| black_box(decode(6, black_box(MEDIUM_POLYLINE6)).is_empty()));
+    });
+    c.bench_function("iter_is_empty_long_polyline6", |b| {
+        b.iter(|| black_box(decode(6, black_box(LONG_POLYLINE6)).is_empty()));
+    });
+}
+
 criterion_group!(
     benches,
     bench_polyline_decode,
@@ -129,5 +135,6 @@ criterion_group!(
     bench_polyline_encode,
     bench_polyline_transcode,
     bench_georust_polyline_transcode,
+    bench_polyline_iter_methods,
 );
 criterion_main!(benches);

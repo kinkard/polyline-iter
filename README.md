@@ -16,9 +16,7 @@ polyline-iter = "0.3"
 ## Example
 
 ```rust
-use polyline_iter::PolylineIter;
-
-let iter = PolylineIter::new(6, "avs_iB}xlxWissBw|zEu``AsxgCyoaAm_z@");
+let iter = polyline_iter::decode(6, "avs_iB}xlxWissBw|zEu``AsxgCyoaAm_z@");
 assert_eq!(
     iter.collect::<Vec<_>>(),
     vec![
@@ -29,14 +27,14 @@ assert_eq!(
     ]
 );
 
-// If the points are not needed, the iterator can be used directly
-assert_eq!(PolylineIter::new(5, "avs_iB}xlxWissBw|zEu``AsxgCyoaAm_z@").count(), 4);
+// Count points without collecting them
+assert_eq!(polyline_iter::decode(5, "avs_iB}xlxWissBw|zEu``AsxgCyoaAm_z@").count(), 4);
 
 // Iterator approach allows to transcode polyline to another precision without intermediate allocations.
-let polyline5 = polyline_iter::encode(5, PolylineIter::new(6, "avs_iB}xlxWissBw|zEu``AsxgCyoaAm_z@"));
+let polyline5 = polyline_iter::encode(5, polyline_iter::decode(6, "avs_iB}xlxWissBw|zEu``AsxgCyoaAm_z@"));
 assert_eq!(polyline5, "cngrIk~inAgtJw~TeoEwtL{sE{{D");
 assert_eq!(
-    PolylineIter::new(5, &polyline5).collect::<Vec<_>>(),
+    polyline_iter::decode(5, &polyline5).collect::<Vec<_>>(),
     vec![
         (55.58514, 12.99958),
         (55.64486, 13.11218),
