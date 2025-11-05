@@ -61,10 +61,10 @@ impl<'a> PolylineIter<'a> {
     #[inline(always)]
     fn varint_decode(&mut self) -> Option<u32> {
         let mut result = 0;
-        for i in 0..self.polyline.len() {
+        for i in 0..self.polyline.len().min(7) {
             // Casting here to i32 here to provide bad value instead of overflow panicking on bad input.
             let chunk = (self.polyline[i] as i32) - 63;
-            result |= (chunk & 0x1f) << (i * 5);
+            result |= (chunk & 0x1f) << (i * 5); // no overflow as i <= 6
             if chunk & 0x20 == 0 {
                 self.polyline = &self.polyline[i + 1..];
                 return Some(result as u32);
