@@ -454,6 +454,11 @@ mod tests {
         assert_eq!(iter.next(), Some((38.5, -120.2)));
         assert_eq!(iter.next(), Some((40.7, -120.95)));
         assert_eq!(iter.next(), None);
+
+        // And let's check that it handles overflowing varint properly.
+        let polyline = "||||||||||||||||||||||||||||||||"; // '|' = 124, (124-63) & 0x20 = 0x20 (continuation bit set)
+        let mut iter = decode(5, polyline);
+        assert_eq!(iter.next(), None); // Should return None because varint_decode fails
     }
 
     #[test]
