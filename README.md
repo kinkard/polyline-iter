@@ -52,6 +52,16 @@ let points = vec![
     (55.71840, 13.22343),
 ];
 assert_eq!(polyline_iter::encode(5, points[1..3].iter().copied()), "ifmrIebsnA_|D_{K");
+
+// This crate also provides encoding/decoding into binary format where URL-compatibility is not required
+let polyline = polyline_iter::encode(5, points);
+let binary = polyline_iter::encode_binary(5, points);
+// Binary format is often 20-30% smaller than polyline format
+assert!(binary.len() < polyline.len());
+
+// Binary format is lossless if the same precision is used
+let transcoded = polyline_iter::encode(5, polyline_iter::decode_binary(5, &binary));
+assert_eq!(transcoded, polyline);
 ```
 
 ## License

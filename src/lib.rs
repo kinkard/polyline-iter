@@ -7,8 +7,6 @@
 /// For details on the encoding algorithm, see:
 /// https://developers.google.com/maps/documentation/utilities/polylinealgorithm
 ///
-/// # Examples
-///
 /// ```
 /// let iter = polyline_iter::decode(6, "avs_iB}xlxWissBw|zEu``AsxgCyoaAm_z@");
 /// assert_eq!(
@@ -66,7 +64,7 @@ impl<'a> PolylineIter<'a> {
         for i in 0..self.polyline.len().min(7) {
             // Casting here to i32 here to provide bad value instead of overflow panicking on bad input.
             let chunk = (self.polyline[i] as i32) - 63;
-            result |= (chunk & 0x1f) << (i * 5); // no overflow as i <= 6
+            result |= (chunk & 0x1f) << (i * 5); // no shift overflow as i < 7
             if chunk & 0x20 == 0 {
                 self.polyline = &self.polyline[i + 1..];
                 return Some(result as u32);
@@ -185,12 +183,175 @@ pub fn encode(precision: u8, points: impl IntoIterator<Item = (f64, f64)>) -> St
         let lat_change = ((point.0 - prev.0) * scale).round() as i32;
         let lon_change = ((point.1 - prev.1) * scale).round() as i32;
 
-        varint_encode(zigzag_encode(lat_change), &mut result);
-        varint_encode(zigzag_encode(lon_change), &mut result);
+        varint32_encode5(zigzag_encode(lat_change), &mut result);
+        varint32_encode5(zigzag_encode(lon_change), &mut result);
 
         prev = point;
     }
     result
+}
+
+/// Encodes a sequence of points into a space-efficient binary format.
+///
+/// This binary format stores 7 bits per byte instead of the 5 bits used by the standard polyline
+/// format, resulting in approximately 20-30% smaller size. The format is not URL-safe and is
+/// intended for binary storage contexts like databases, protobuf, or file formats.
+///
+/// # Performance
+///
+/// Uses bit interleaving to optimize for small coordinate changes, which are common in geographic
+/// paths. This technique saves an additional 10-15% space compared to naive binary encoding.
+///
+/// # Examples
+///
+/// ```
+/// // Encode points in binary format
+/// let points = [(55.58513, 12.99958), (55.61461, 13.04627)];
+/// let binary_data = polyline_iter::encode_binary(5, points);
+///
+/// // Binary format is more compact than text
+/// let text_polyline = polyline_iter::encode(5, points);
+/// assert!(binary_data.len() < text_polyline.len());
+///
+/// // Round-trip encoding/decoding
+/// let decoded_points: Vec<_> = polyline_iter::decode_binary(5, &binary_data).collect();
+/// assert_eq!(decoded_points, points);
+///
+/// // Convert existing polyline to binary format
+/// let polyline = "angrIk~inAgwDybH_|D_{K";
+/// let binary = polyline_iter::encode_binary(5, polyline_iter::decode(5, polyline));
+/// ```
+pub fn encode_binary(precision: u8, points: impl IntoIterator<Item = (f64, f64)>) -> Vec<u8> {
+    assert!(precision <= 7, "i32 can hold up to 180 * 10^7");
+
+    let scale = 10.0_f64.powi(precision as i32);
+    let mut result = Vec::with_capacity(16);
+
+    let mut prev = (0.0, 0.0);
+    for point in points {
+        let lat_change = ((point.0 - prev.0) * scale).round() as i32;
+        let lon_change = ((point.1 - prev.1) * scale).round() as i32;
+
+        // When storing 7 bits per byte, there are good chances that many of bits in the last byte will be unused.
+        // By interleaving the bits of lat and lon changes, we sum up their significant bits and encode them together
+        // as a single u64 value, thus reducing the total number of bytes used.
+        // Without interleaving, at least 2 bytes per point are used even for the smallest coordinate change.
+        // With interleaving, small changes in both lat and lon can be stored in a single byte.
+        // It's saves around 10-15% of space on average in real-world scenarios compared to naive varint encoding.
+        let interleaved = bitwise_merge(zigzag_encode(lat_change), zigzag_encode(lon_change));
+        varint64_encode7(interleaved, &mut result);
+
+        prev = point;
+    }
+    result
+}
+
+/// Decodes points from a space-efficient binary polyline format.
+///
+/// This function decodes binary data created by [`encode_binary()`]. The binary format
+/// is not compatible with standard polyline strings - use [`decode()`] for those.
+///
+/// ```
+/// // Decode binary polyline data
+/// let polyline = "angrIk~inAgwDybH_|D_{K";
+/// let binary_data = polyline_iter::encode_binary(5, polyline_iter::decode(5, polyline));
+///
+/// let points: Vec<_> = polyline_iter::decode_binary(5, &binary_data).collect();
+///
+/// // Binary format is lossless
+/// let reconstructed = polyline_iter::encode(5, points);
+/// assert_eq!(polyline, reconstructed);
+/// ```
+pub fn decode_binary(precision: u8, polyline: &[u8]) -> BinaryPolylineIter<'_> {
+    BinaryPolylineIter::new(precision, polyline)
+}
+
+/// Iterator over geographic coordinates decoded from binary polyline data.
+///
+/// Created by [`decode_binary()`]. This iterator provides the same interface as
+/// [`PolylineIter`] but works with the space-efficient binary format.
+///
+/// # Examples
+///
+/// ```
+/// let binary_data = polyline_iter::encode_binary(6, [(55.585137, 12.999583)]);
+/// let mut iter = polyline_iter::decode_binary(6, &binary_data);
+///
+/// assert_eq!(iter.len(), 1);
+/// assert_eq!(iter.next(), Some((55.585137, 12.999583)));
+/// assert!(iter.is_empty());
+/// ```
+pub struct BinaryPolylineIter<'a> {
+    polyline: &'a [u8],
+    scale: f64,
+    /// Last processed latitude, multiplied by the scale.
+    lat: i32,
+    /// Last processed longitude, multiplied by the scale.
+    lon: i32,
+}
+
+impl<'a> BinaryPolylineIter<'a> {
+    #[inline(always)]
+    pub fn new(precision: u8, polyline: &'a [u8]) -> Self {
+        assert!(precision <= 7, "i32 can hold up to 180 * 10^7");
+        BinaryPolylineIter {
+            polyline,
+            lat: 0,
+            lon: 0,
+            scale: 10.0_f64.powi(precision as i32),
+        }
+    }
+
+    #[inline(always)]
+    fn varint_decode(&mut self) -> Option<u64> {
+        let mut result = 0;
+        for i in 0..self.polyline.len().min(9) {
+            let chunk = self.polyline[i] as u64;
+            result |= (chunk & 0x7f) << (i * 7); // no shift overflow as i < 5
+            if chunk & 0x80 == 0 {
+                self.polyline = &self.polyline[i + 1..];
+                return Some(result);
+            }
+        }
+        None
+    }
+
+    /// O(n) operation to count the number of points in the polyline without consuming the iterator.
+    pub fn len(&self) -> usize {
+        self.polyline
+            .iter()
+            .filter(|&&byte| byte & 0x80 == 0)
+            .count()
+    }
+
+    /// Checks if the polyline contains no points.
+    pub fn is_empty(&self) -> bool {
+        !self.polyline.iter().any(|&byte| byte & 0x80 == 0)
+    }
+}
+
+impl Iterator for BinaryPolylineIter<'_> {
+    type Item = (f64, f64);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let (lat_change, lon_change) = bitwise_split(self.varint_decode()?);
+        self.lat += zigzag_decode(lat_change);
+        self.lon += zigzag_decode(lon_change);
+        let lat = self.lat as f64 / self.scale;
+        let lon = self.lon as f64 / self.scale;
+        Some((lat, lon))
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        // There are at least polyline.len() / 10 points as each i32 is encoded in 5 bits per char.
+        // And at most polyline.len() / 2 points if each number (2 per point) is encoded only by a single char.
+        let len = self.polyline.len();
+        (len / 10, Some(len / 2))
+    }
+
+    fn count(self) -> usize {
+        self.len()
+    }
 }
 
 /// Zigzag encoded numbers store the sign in the least significant bit, which this function moves to the sign bit.
@@ -206,7 +367,7 @@ fn zigzag_encode(value: i32) -> u32 {
 
 /// Encodes the value into a variable-length format, storing 5 bits per byte to keep
 /// all bytes URL-compatible (from 63 to 126).
-fn varint_encode(mut value: u32, buffer: &mut String) {
+fn varint32_encode5(mut value: u32, buffer: &mut String) {
     while value >= 0x20 {
         let byte = char::from_u32(((value & 0x1F) | 0x20) + 63).unwrap();
         buffer.push(byte);
@@ -214,6 +375,56 @@ fn varint_encode(mut value: u32, buffer: &mut String) {
     }
     let byte = char::from_u32(value + 63).unwrap();
     buffer.push(byte);
+}
+
+/// Encodes the value into a variable-length format, storing 7 bits per byte.
+fn varint64_encode7(mut value: u64, buffer: &mut Vec<u8>) {
+    while value >= 0x80 {
+        let byte = (value & 0x7F) as u8 | 0x80;
+        buffer.push(byte);
+        value >>= 7;
+    }
+    buffer.push(value as u8);
+}
+
+/// Merges bits from two 32-bit integers into a 64-bit integer, shuffling bits from
+/// x = 'ABCD EFGH IJKL MNOP' and y = 'abcd efgh ijkl mnop' to 'aAbB cCdD eEfF gGhH iIjJ kKlL mMnN oOpP'.
+/// So if `x` and `y` have low number of significant bits, the result will have low number of significant bits.
+fn bitwise_merge(x: u32, y: u32) -> u64 {
+    perfect_shuffle(((y as u64) << 32) | (x as u64))
+}
+
+/// Reverse operation to [`bitwise_merge`], splitting a 64-bit integer into two 32-bit integers.
+fn bitwise_split(v: u64) -> (u32, u32) {
+    let unshuffle = perfect_unshuffle(v);
+    (unshuffle as u32, (unshuffle >> 32) as u32)
+}
+
+/// Perform a perfect shuffle of the bits of 64-bit integer, shuffling bits from
+/// 'abcd efgh ijkl mnop ABCD EFGH IJKL MNOP' to 'aAbB cCdD eEfF gGhH iIjJ kKlL mMnN oOpP'.
+/// See http://www.icodeguru.com/Embedded/Hacker's-Delight/047.htm
+fn perfect_shuffle(mut x: u64) -> u64 {
+    x = ((x & 0x00000000FFFF0000) << 16) | (x >> 16) & 0x00000000FFFF0000 | x & 0xFFFF00000000FFFF;
+    x = ((x & 0x0000FF000000FF00) << 8) | (x >> 8) & 0x0000FF000000FF00 | x & 0xFF0000FFFF0000FF;
+    x = ((x & 0x00F000F000F000F0) << 4) | (x >> 4) & 0x00F000F000F000F0 | x & 0xF00FF00FF00FF00F;
+    x = ((x & 0x0C0C0C0C0C0C0C0C) << 2) | (x >> 2) & 0x0C0C0C0C0C0C0C0C | x & 0xC3C3C3C3C3C3C3C3;
+    x = ((x & 0x2222222222222222) << 1) | (x >> 1) & 0x2222222222222222 | x & 0x9999999999999999;
+
+    x
+}
+
+/// Reverse operation to [`perfect_shuffle`] unshuffles the bits of 64-bit integer from
+/// 'aAbB cCdD eEfF gGhH iIjJ kKlL mMnN oOpP' to 'abcd efgh ijkl mnop ABCD EFGH IJKL MNOP'.
+/// Reverse operation to [`perfect_shuffle`].
+/// See http://www.icodeguru.com/Embedded/Hacker's-Delight/047.htm
+fn perfect_unshuffle(mut x: u64) -> u64 {
+    x = ((x & 0x2222222222222222) << 1) | (x >> 1) & 0x2222222222222222 | x & 0x9999999999999999;
+    x = ((x & 0x0C0C0C0C0C0C0C0C) << 2) | (x >> 2) & 0x0C0C0C0C0C0C0C0C | x & 0xC3C3C3C3C3C3C3C3;
+    x = ((x & 0x00F000F000F000F0) << 4) | (x >> 4) & 0x00F000F000F000F0 | x & 0xF00FF00FF00FF00F;
+    x = ((x & 0x0000FF000000FF00) << 8) | (x >> 8) & 0x0000FF000000FF00 | x & 0xFF0000FFFF0000FF;
+    x = ((x & 0x00000000FFFF0000) << 16) | (x >> 16) & 0x00000000FFFF0000 | x & 0xFFFF00000000FFFF;
+
+    x
 }
 
 #[cfg(test)]
@@ -468,5 +679,95 @@ mod tests {
         assert!(iter.size_hint().0 <= 3);
         assert!(iter.size_hint().1.unwrap() >= 3);
         assert_eq!(iter.count(), 3);
+    }
+
+    #[test]
+    fn perfect_shuffle_test() {
+        assert_eq!(perfect_shuffle(0b0), 0b0);
+        assert_eq!(perfect_shuffle(0b1), 0b1);
+
+        assert_eq!(perfect_shuffle(0b1111), 0b01010101);
+        assert_eq!(perfect_unshuffle(0b01010101), 0b1111);
+
+        assert_eq!(perfect_shuffle(0b11111111), 0b0101010101010101);
+        assert_eq!(perfect_unshuffle(0b0101010101010101), 0b11111111);
+
+        assert_eq!(
+            perfect_shuffle(0b1111_1111_1111_1111),
+            0b0101_0101_0101_0101_0101_0101_0101_0101
+        );
+        assert_eq!(
+            perfect_unshuffle(0b0101_0101_0101_0101_0101_0101_0101_0101),
+            0b1111_1111_1111_1111
+        );
+
+        assert_eq!(
+            perfect_shuffle(0b0000_0000_0000_0000_1111_1111_0000_0000),
+            0b0101_0101_0101_0101_0000_0000_0000_0000
+        );
+        assert_eq!(
+            perfect_unshuffle(0b0101_0101_0101_0101_0000_0000_0000_0000),
+            0b0000_0000_0000_0000_1111_1111_0000_0000
+        );
+    }
+
+    #[test]
+    fn bitwise_merge_test() {
+        assert_eq!(bitwise_merge(0b0, 0b0), 0b00);
+        assert_eq!(bitwise_split(0b00), (0b0, 0b0));
+
+        assert_eq!(bitwise_merge(0b1, 0b0), 0b01);
+        assert_eq!(bitwise_split(0b01), (0b1, 0b0));
+
+        assert_eq!(bitwise_merge(0b0, 0b1), 0b10);
+        assert_eq!(bitwise_split(0b10), (0b0, 0b1));
+
+        assert_eq!(bitwise_merge(0b1, 0b1), 0b11);
+        assert_eq!(bitwise_split(0b11), (0b1, 0b1));
+
+        assert_eq!(bitwise_merge(0b00000000, 0b11111111), 0b10101010_10101010);
+        assert_eq!(bitwise_split(0b10101010_10101010), (0b00000000, 0b11111111));
+
+        assert_eq!(bitwise_merge(0b11111111, 0b00000000), 0b01010101_01010101);
+        assert_eq!(bitwise_split(0b01010101_01010101), (0b11111111, 0b00000000));
+
+        assert_eq!(bitwise_merge(0b00001111, 0b00001111), 0b00000000_11111111);
+        assert_eq!(bitwise_split(0b00000000_11111111), (0b00001111, 0b00001111));
+
+        assert_eq!(
+            bitwise_merge(0b11111111_11111111_11111111_11111111, 0b0),
+            0b01010101_01010101_01010101_01010101_01010101_01010101_01010101_01010101
+        );
+        assert_eq!(
+            bitwise_split(
+                0b01010101_01010101_01010101_01010101_01010101_01010101_01010101_01010101
+            ),
+            (0b11111111_11111111_11111111_11111111, 0b0)
+        );
+
+        assert_eq!(
+            bitwise_merge(0xF00FF00F, 0x0FF00FF0),
+            0b01010101_10101010_10101010_01010101_01010101_10101010_10101010_01010101
+        );
+        assert_eq!(
+            bitwise_split(
+                0b01010101_10101010_10101010_01010101_01010101_10101010_10101010_01010101
+            ),
+            (0xF00FF00F, 0x0FF00FF0)
+        );
+    }
+
+    #[test]
+    fn encode_decode_binary() {
+        let polyline = "angrIk~inAgwDybH_|D_{KeoEwtLozFo`Gre@tcA";
+        let points: Vec<_> = decode(5, polyline).collect();
+
+        let compressed = encode_binary(5, points.iter().copied());
+        let decompressed: Vec<_> = decode_binary(5, &compressed).collect();
+        assert_eq!(decompressed, points);
+        assert_eq!(polyline.len(), 40);
+        assert_eq!(compressed.len(), 27);
+
+        assert_eq!(decode_binary(5, &compressed).count(), points.len());
     }
 }

@@ -1,5 +1,5 @@
 use criterion::{Criterion, criterion_group, criterion_main};
-use polyline_iter::{decode, encode};
+use polyline_iter::{decode, decode_binary, encode, encode_binary};
 use std::hint::black_box;
 
 const SHORT_POLYLINE5: &str = "angrIk~inAgwDybH";
@@ -118,10 +118,45 @@ fn bench_polyline_iter_methods(c: &mut Criterion) {
     });
 }
 
+fn bench_polyline_compression(c: &mut Criterion) {
+    let short_points = decode(5, SHORT_POLYLINE5).collect::<Vec<_>>();
+    c.bench_function("encode_binary_short", |b| {
+        b.iter(|| black_box(encode_binary(5, black_box(short_points.iter().copied()))));
+    });
+    let medium_points = decode(6, MEDIUM_POLYLINE6).collect::<Vec<_>>();
+    c.bench_function("cencode_binary_medium", |b| {
+        b.iter(|| black_box(encode_binary(6, black_box(medium_points.iter().copied()))));
+    });
+    let long_points = decode(6, LONG_POLYLINE6).collect::<Vec<_>>();
+    c.bench_function("encode_binary_long", |b| {
+        b.iter(|| black_box(encode_binary(6, black_box(long_points.iter().copied()))));
+    });
+
+    let compressed_short = encode_binary(5, short_points);
+    c.bench_function("decode_binary_short", |b| {
+        b.iter(|| {
+            black_box(decode_binary(5, black_box(&compressed_short)).fold(0, |acc, _| acc + 1))
+        });
+    });
+    let compressed_medium = encode_binary(6, medium_points);
+    c.bench_function("decode_binary_medium", |b| {
+        b.iter(|| {
+            black_box(decode_binary(6, black_box(&compressed_medium)).fold(0, |acc, _| acc + 1))
+        });
+    });
+    let compressed_long = encode_binary(6, long_points);
+    c.bench_function("decode_binary_long", |b| {
+        b.iter(|| {
+            black_box(decode_binary(6, black_box(&compressed_long)).fold(0, |acc, _| acc + 1))
+        });
+    });
+}
+
 criterion_group!(
     benches,
     bench_polyline_iter,
     bench_georust_polyline,
     bench_polyline_iter_methods,
+    bench_polyline_compression,
 );
 criterion_main!(benches);
