@@ -1,3 +1,5 @@
+#![doc = include_str!("../README.md")]
+
 /// Iterator over geographic coordinates (latitude/longitude pairs) decoded from a polyline-encoded string.
 ///
 /// Supports both formats:
@@ -24,14 +26,14 @@
 ///
 /// // Iterator approach allows to transcode polyline to another precision without intermediate allocations.
 /// let polyline5 = polyline_iter::encode(5, polyline_iter::decode(6, "avs_iB}xlxWissBw|zEu``AsxgCyoaAm_z@"));
-/// assert_eq!(polyline5, "cngrIk~inAgtJw~TeoEwtL{sE{{D");
+/// assert_eq!(polyline5, "cngrIk~inAetJy~TeoEwtL{sEy{D");
 /// assert_eq!(
 ///     polyline_iter::decode(5, &polyline5).collect::<Vec<_>>(),
 ///     vec![
 ///         (55.58514, 12.99958),
-///         (55.64486, 13.11218),
-///         (55.67817, 13.18222),
-///         (55.71223, 13.21244)
+///         (55.64485, 13.11219),
+///         (55.67816, 13.18223),
+///         (55.71222, 13.21244)
 ///     ],
 /// );
 /// ```
@@ -180,15 +182,15 @@ pub fn encode(precision: u8, points: impl IntoIterator<Item = (f64, f64)>) -> St
     let scale = 10.0_f64.powi(precision as i32);
     let mut result = String::with_capacity(16);
 
-    let mut prev = (0.0, 0.0);
+    let mut prev = (0, 0);
     for point in points {
-        let lat_change = ((point.0 - prev.0) * scale).round() as i32;
-        let lon_change = ((point.1 - prev.1) * scale).round() as i32;
+        let lat = (point.0 * scale).round() as i32;
+        let lon = (point.1 * scale).round() as i32;
 
-        varint32_encode5(zigzag_encode(lat_change), &mut result);
-        varint32_encode5(zigzag_encode(lon_change), &mut result);
+        varint32_encode5(zigzag_encode(lat - prev.0), &mut result);
+        varint32_encode5(zigzag_encode(lon - prev.1), &mut result);
 
-        prev = point;
+        prev = (lat, lon);
     }
     result
 }
@@ -229,21 +231,21 @@ pub fn encode_binary(precision: u8, points: impl IntoIterator<Item = (f64, f64)>
     let scale = 10.0_f64.powi(precision as i32);
     let mut result = Vec::with_capacity(16);
 
-    let mut prev = (0.0, 0.0);
+    let mut prev = (0, 0);
     for point in points {
-        let lat_change = ((point.0 - prev.0) * scale).round() as i32;
-        let lon_change = ((point.1 - prev.1) * scale).round() as i32;
+        let lat = (point.0 * scale).round() as i32;
+        let lon = (point.1 * scale).round() as i32;
 
         // When storing 7 bits per byte, there are good chances that many of bits in the last byte will be unused.
         // By interleaving the bits of lat and lon changes, we sum up their significant bits and encode them together
         // as a single u64 value, thus reducing the total number of bytes used.
         // Without interleaving, at least 2 bytes per point are used even for the smallest coordinate change.
         // With interleaving, small changes in both lat and lon can be stored in a single byte.
-        // It's saves around 10-15% of space on average in real-world scenarios compared to naive varint encoding.
-        let interleaved = bitwise_merge(zigzag_encode(lat_change), zigzag_encode(lon_change));
+        // It saves around 10-15% of space on average in real-world scenarios compared to naive varint encoding.
+        let interleaved = bitwise_merge(zigzag_encode(lat - prev.0), zigzag_encode(lon - prev.1));
         varint64_encode7(interleaved, &mut result);
 
-        prev = point;
+        prev = (lat, lon);
     }
     result
 }
@@ -371,17 +373,17 @@ fn zigzag_encode(value: i32) -> u32 {
 
 /// Encodes the value into a variable-length format, storing 5 bits per byte to keep
 /// all bytes URL-compatible (from 63 to 126).
+#[inline(always)]
 fn varint32_encode5(mut value: u32, buffer: &mut String) {
     while value >= 0x20 {
-        let byte = char::from_u32(((value & 0x1F) | 0x20) + 63).unwrap();
-        buffer.push(byte);
+        buffer.push((((value & 0x1F) | 0x20) as u8 + 63) as char);
         value >>= 5;
     }
-    let byte = char::from_u32(value + 63).unwrap();
-    buffer.push(byte);
+    buffer.push((value as u8 + 63) as char);
 }
 
 /// Encodes the value into a variable-length format, storing 7 bits per byte.
+#[inline(always)]
 fn varint64_encode7(mut value: u64, buffer: &mut Vec<u8>) {
     while value >= 0x80 {
         let byte = (value & 0x7F) as u8 | 0x80;
