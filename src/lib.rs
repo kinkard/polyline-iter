@@ -117,6 +117,8 @@ impl Iterator for PolylineIter<'_> {
     }
 }
 
+impl core::iter::FusedIterator for PolylineIter<'_> {}
+
 /// Decodes a polyline-encoded string into an iterator over geographic coordinates (latitude/longitude pairs).
 ///
 /// This is a convenience function that wraps [`PolylineIter::new()`] and returns an iterator over points.
@@ -353,6 +355,8 @@ impl Iterator for BinaryPolylineIter<'_> {
         self.len()
     }
 }
+
+impl core::iter::FusedIterator for BinaryPolylineIter<'_> {}
 
 /// Zigzag encoded numbers store the sign in the least significant bit, which this function moves to the sign bit.
 fn zigzag_decode(i: u32) -> i32 {
