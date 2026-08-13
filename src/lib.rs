@@ -61,13 +61,13 @@ impl<'a> PolylineIter<'a> {
     #[inline(always)]
     fn varint_decode(&mut self) -> Option<u32> {
         let mut result = 0;
+        // 7 chunks of 5 bits is enough to hold any u32 value.
         for i in 0..self.polyline.len().min(7) {
-            // Casting here to i32 here to provide bad value instead of overflow panicking on bad input.
-            let chunk = (self.polyline[i] as i32) - 63;
+            let chunk = self.polyline[i].wrapping_sub(63) as u32;
             result |= (chunk & 0x1f) << (i * 5); // no shift overflow as i < 7
             if chunk & 0x20 == 0 {
                 self.polyline = &self.polyline[i + 1..];
-                return Some(result as u32);
+                return Some(result);
             }
         }
         None
