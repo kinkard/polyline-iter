@@ -20,15 +20,15 @@ fn bench_polyline_iter(c: &mut Criterion) {
 
     let short_points = decode(5, black_box(SHORT_POLYLINE5)).collect::<Vec<_>>();
     c.bench_function("encode_short", |b| {
-        b.iter(|| black_box(encode(5, short_points.clone())));
+        b.iter(|| black_box(encode(5, black_box(short_points.iter().copied()))));
     });
     let medium_points = decode(5, black_box(MEDIUM_POLYLINE6)).collect::<Vec<_>>();
     c.bench_function("encode_medium", |b| {
-        b.iter(|| black_box(encode(6, medium_points.clone())));
+        b.iter(|| black_box(encode(6, black_box(medium_points.iter().copied()))));
     });
     let long_points = decode(6, black_box(LONG_POLYLINE6)).collect::<Vec<_>>();
     c.bench_function("encode_long", |b| {
-        b.iter(|| black_box(encode(6, long_points.clone())));
+        b.iter(|| black_box(encode(6, black_box(long_points.iter().copied()))));
     });
 
     c.bench_function("transcode_medium", |b| {
@@ -124,7 +124,7 @@ fn bench_polyline_compression(c: &mut Criterion) {
         b.iter(|| black_box(encode_binary(5, black_box(short_points.iter().copied()))));
     });
     let medium_points = decode(6, MEDIUM_POLYLINE6).collect::<Vec<_>>();
-    c.bench_function("cencode_binary_medium", |b| {
+    c.bench_function("encode_binary_medium", |b| {
         b.iter(|| black_box(encode_binary(6, black_box(medium_points.iter().copied()))));
     });
     let long_points = decode(6, LONG_POLYLINE6).collect::<Vec<_>>();
