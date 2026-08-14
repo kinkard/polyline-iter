@@ -37,6 +37,7 @@
 ///     ],
 /// );
 /// ```
+#[derive(Clone)]
 pub struct PolylineIter<'a> {
     polyline: &'a [u8],
     scale: f64,
@@ -285,6 +286,7 @@ pub fn decode_binary(precision: u8, polyline: &[u8]) -> BinaryPolylineIter<'_> {
 /// assert_eq!(iter.next(), Some((55.585137, 12.999583)));
 /// assert!(iter.is_empty());
 /// ```
+#[derive(Clone)]
 pub struct BinaryPolylineIter<'a> {
     polyline: &'a [u8],
     scale: f64,
