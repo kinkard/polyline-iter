@@ -80,7 +80,7 @@ impl<'a> PolylineIter<'a> {
     pub fn len(&self) -> usize {
         self.polyline
             .iter()
-            .filter(|&&byte| (byte as i8 - 63) & 0x20 == 0)
+            .filter(|&&byte| byte.wrapping_sub(63) & 0x20 == 0)
             .count()
             / 2 // Each point has 2 numbers
     }
@@ -89,7 +89,7 @@ impl<'a> PolylineIter<'a> {
     pub fn is_empty(&self) -> bool {
         self.polyline
             .iter()
-            .filter(|&&byte| (byte as i8 - 63) & 0x20 == 0)
+            .filter(|&&byte| byte.wrapping_sub(63) & 0x20 == 0)
             .nth(1)
             .is_none()
     }
@@ -188,8 +188,8 @@ pub fn encode(precision: u8, points: impl IntoIterator<Item = (f64, f64)>) -> St
         let lat = (point.0 * scale).round() as i32;
         let lon = (point.1 * scale).round() as i32;
 
-        varint32_encode5(zigzag_encode(lat - prev.0), &mut result);
-        varint32_encode5(zigzag_encode(lon - prev.1), &mut result);
+        varint32_encode5(zigzag_encode(lat.wrapping_sub(prev.0)), &mut result);
+        varint32_encode5(zigzag_encode(lon.wrapping_sub(prev.1)), &mut result);
 
         prev = (lat, lon);
     }
@@ -243,7 +243,10 @@ pub fn encode_binary(precision: u8, points: impl IntoIterator<Item = (f64, f64)>
         // Without interleaving, at least 2 bytes per point are used even for the smallest coordinate change.
         // With interleaving, small changes in both lat and lon can be stored in a single byte.
         // It saves around 10-15% of space on average in real-world scenarios compared to naive varint encoding.
-        let interleaved = bitwise_merge(zigzag_encode(lat - prev.0), zigzag_encode(lon - prev.1));
+        let interleaved = bitwise_merge(
+            zigzag_encode(lat.wrapping_sub(prev.0)),
+            zigzag_encode(lon.wrapping_sub(prev.1)),
+        );
         varint64_encode7(interleaved, &mut result);
 
         prev = (lat, lon);
