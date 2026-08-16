@@ -10,7 +10,7 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-polyline-iter = "0.3"
+polyline-iter = "0.4"
 ```
 
 ## Example
@@ -51,14 +51,6 @@ let points = vec![
     (55.71222, 13.21244)
 ];
 assert_eq!(polyline_iter::encode(5, points[1..3].iter().copied()), "icsrIe~_oAeoEwtL");
-
-// Alternatively to URL-compatible polyline format, binary format can be used for more compact representation.
-let polyline: String = polyline_iter::encode(5, points.iter().copied());
-let binary: Vec<u8> = polyline_iter::encode_binary(5, points);
-assert!(binary.len() < polyline.len()); // 20-30% smaller
-
-let transcoded = polyline_iter::encode(5, polyline_iter::decode_binary(5, &binary));
-assert_eq!(transcoded, polyline);
 ```
 
 ## License
