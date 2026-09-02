@@ -77,6 +77,7 @@ impl<'a> PolylineIter<'a> {
     }
 
     /// O(n) operation to count the number of points in the polyline without consuming the iterator.
+    #[inline(always)]
     pub fn len(&self) -> usize {
         self.polyline
             .iter()
@@ -86,6 +87,7 @@ impl<'a> PolylineIter<'a> {
     }
 
     /// Checks if the polyline contains no points.
+    #[inline(always)]
     pub fn is_empty(&self) -> bool {
         self.polyline
             .iter()
@@ -98,6 +100,7 @@ impl<'a> PolylineIter<'a> {
 impl Iterator for PolylineIter<'_> {
     type Item = (f64, f64);
 
+    #[inline(always)]
     fn next(&mut self) -> Option<Self::Item> {
         let lat_change = self.varint_decode()?;
         let lon_change = self.varint_decode()?;
@@ -108,6 +111,7 @@ impl Iterator for PolylineIter<'_> {
         Some((lat, lon))
     }
 
+    #[inline(always)]
     fn size_hint(&self) -> (usize, Option<usize>) {
         // There are at least polyline.len() / 14 points as each i32 is encoded in 5 bits per char.
         // And at most polyline.len() / 2 points if each number (2 per point) is encoded only by a single char.
@@ -115,6 +119,7 @@ impl Iterator for PolylineIter<'_> {
         (len / 14, Some(len / 2))
     }
 
+    #[inline(always)]
     fn count(self) -> usize {
         self.len()
     }
