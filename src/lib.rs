@@ -109,10 +109,10 @@ impl Iterator for PolylineIter<'_> {
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        // There are at least polyline.len() / 12 points as each i32 is encoded in 5 bits per char.
+        // There are at least polyline.len() / 14 points as each i32 is encoded in 5 bits per char.
         // And at most polyline.len() / 2 points if each number (2 per point) is encoded only by a single char.
         let len = self.polyline.len();
-        (len / 12, Some(len / 2))
+        (len / 14, Some(len / 2))
     }
 
     fn count(self) -> usize {
@@ -470,5 +470,14 @@ mod tests {
         assert!(iter.size_hint().0 <= 3);
         assert!(iter.size_hint().1.unwrap() >= 3);
         assert_eq!(iter.count(), 3);
+
+        let iter = decode(6, "");
+        assert_eq!(iter.size_hint(), (0, Some(0)));
+
+        let polyline = encode(7, [(179.9, 89.9), (-179.9, -89.9)]);
+        assert_eq!(polyline.len(), 28);
+        let iter = decode(7, &polyline);
+        assert!(iter.size_hint().0 <= 2);
+        assert!(iter.size_hint().1.unwrap() >= 2);
     }
 }
